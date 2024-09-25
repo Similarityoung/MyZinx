@@ -1,8 +1,8 @@
 package znet
 
 import (
+	"errors"
 	"fmt"
-	"io"
 	"net"
 	"zinx/ziface"
 )
@@ -17,6 +17,16 @@ type Server struct {
 	IP string
 	// Server port
 	Port int
+}
+
+// CallBackToClient 当前客户端链接的所绑定的 API,后续由框架使用者自行开发
+func CallBackToClient(conn *net.TCPConn, data []byte, cnt int) error {
+	fmt.Println("[Conn Handle] CallBackToClient ...")
+	if _, err := conn.Write(data[:cnt]); err != nil {
+		fmt.Println("write back buf err", err)
+		return errors.New("CallBackToClient error")
+	}
+	return nil
 }
 
 // Start  server
@@ -39,6 +49,8 @@ func (s *Server) Start() {
 		}
 
 		fmt.Println("start Zinx server succ, ", s.Name, " succ, Listening...")
+		var cid uint32
+		cid = 0
 
 		// 阻塞的等待客户端链接。处理客户端链接业务（读写）
 		for {
@@ -48,26 +60,10 @@ func (s *Server) Start() {
 				continue
 			}
 
-			// 客户端已经与客户端建立链接，做一些业务，做一个最基本的最大512字节长度的回写
-			go func() {
-				for {
-					bytes := make([]byte, 512)
-					read, err := tcp.Read(bytes)
-					if err != nil && err != io.EOF {
-						fmt.Println("read err", err)
-						continue
-					} else if err == io.EOF {
-						return
-					}
-
-					fmt.Printf("recv from client, data: %s\n", bytes[:read])
-
-					if _, err := tcp.Write(bytes[:read]); err != nil {
-						fmt.Println("write err", err)
-						continue
-					}
-				}
-			}()
+			// 将处理连接的业务方法和 conn 进行绑定，得到我们的连接模块
+			connection := NewConnection(tcp, cid, CallBackToClient)
+			cid++
+			connection.Start()
 		}
 	}()
 }
