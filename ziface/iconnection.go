@@ -11,6 +11,7 @@ type IConnection interface {
 	Stop()
 
 	// GetConnection 获取当前链接绑定的socket conn
+	// 这是服务器的 conn
 	GetConnection() *net.TCPConn
 
 	// GetConnID 获取当前链接模块的链接ID

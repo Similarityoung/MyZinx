@@ -18,21 +18,21 @@ type Connection struct {
 	// 当前链接的状态
 	isClosed bool
 
-	// 当前链接所绑定的处理业务方法 API
-	handleAPI ziface.HandleFunc
-
 	// 告知当前链接已经退出/停止的 channel
 	ExitChan chan bool
+
+	// 该链接处理的方法 Router
+	Router ziface.IRouter
 }
 
 // NewConnection 初始化链接模块的方法
-func NewConnection(conn *net.TCPConn, connID uint32, callbackApi ziface.HandleFunc) *Connection {
+func NewConnection(conn *net.TCPConn, connID uint32, router ziface.IRouter) *Connection {
 	c := &Connection{
-		Conn:      conn,
-		ConnID:    connID,
-		handleAPI: callbackApi,
-		isClosed:  false,
-		ExitChan:  make(chan bool, 1),
+		Conn:     conn,
+		ConnID:   connID,
+		Router:   router,
+		isClosed: false,
+		ExitChan: make(chan bool, 1),
 	}
 	return c
 }
@@ -81,6 +81,11 @@ func (connection *Connection) RemoteAddr() net.Addr {
 
 // SendMsg 发送数据，将数据发送给远程的客户端
 func (connection *Connection) SendMsg(msgId uint32, data []byte) error {
+	_, err := connection.Conn.Write(data)
+	if err != nil {
+		fmt.Println("SendMsg error", err)
+		return err
+	}
 	return nil
 }
 
@@ -92,7 +97,8 @@ func (connection *Connection) StartReader() {
 
 	for {
 		buf := make([]byte, 512)
-		read, err := connection.Conn.Read(buf)
+		// 必须读到从客户端发来的数据才可以进行下一步处理
+		_, err := connection.Conn.Read(buf)
 		if err != nil && err != io.EOF {
 			fmt.Println("recv buf err", err)
 			continue
@@ -100,11 +106,25 @@ func (connection *Connection) StartReader() {
 			return
 		}
 
-		// 调用当前链接所绑定的 HandleAPI
-		if err := connection.handleAPI(connection.Conn, buf, read); err != nil {
-			fmt.Println("ConnID", connection.ConnID, "handle is error", "err is ", err)
-			break
+		//// 调用当前链接所绑定的 HandleAPI
+		//if err := connection.handleAPI(connection.Conn, buf, read); err != nil {
+		//	fmt.Println("ConnID", connection.ConnID, "handle is error", "err is ", err)
+		//	break
+		//}
+
+		// 得到当前数据的 request 请求
+		// 这个 buf 是服务器读出来的数据，由客户端发送过来的，现在要把它交给路由，让路由处理
+		request := &Request{
+			conn: connection,
+			data: buf,
 		}
+
+		// 执行注册路由的 Handle 方法
+		go func() {
+			connection.Router.PreHandle(request)
+			connection.Router.Handle(request)
+			connection.Router.PostHandle(request)
+		}()
 	}
 
 }

@@ -10,4 +10,7 @@ type IServer interface {
 
 	// Serve Run server
 	Serve()
+
+	// AddRouter Add router to server
+	AddRouter(router IRouter)
 }
