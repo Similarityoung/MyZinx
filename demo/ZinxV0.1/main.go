@@ -4,7 +4,7 @@ import "zinx/znet"
 
 func main() {
 
-	s := znet.NewServer("Zinx V0.1")
+	s := znet.NewServer()
 	s.Serve()
 
 }

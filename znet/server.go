@@ -3,6 +3,7 @@ package znet
 import (
 	"fmt"
 	"net"
+	"zinx/utils"
 	"zinx/ziface"
 )
 
@@ -36,6 +37,10 @@ type Server struct {
 
 // Start  server
 func (s *Server) Start() {
+	fmt.Printf("[Zinx] Server Name: %s, listenner at IP: %s, Port %d is starting\n",
+		utils.GlobalObject.Name, utils.GlobalObject.Host, utils.GlobalObject.TcpPort)
+	fmt.Printf("[Zinx] Version %s, MaxConn: %d, MaxPackageSize: %d\n",
+		utils.GlobalObject.Version, utils.GlobalObject.MaxConn, utils.GlobalObject.MaxPackageSize)
 	fmt.Printf("[Start] Server Listenner at IP: %s, Port %d, is starting\n", s.IP, s.Port)
 
 	// 开启一个 go 承载服务,因为监听只是服务的一个业务，还有其他的业务需要实现，所以监听开个协程来进行
@@ -99,12 +104,12 @@ func (s *Server) AddRouter(router ziface.IRouter) {
 }
 
 // NewServer create a server
-func NewServer(name string) ziface.IServer {
+func NewServer() ziface.IServer {
 	s := &Server{
-		Name:      name,
+		Name:      utils.GlobalObject.Name,
 		IPVersion: "tcp4",
-		IP:        "0.0.0.0",
-		Port:      8999,
+		IP:        utils.GlobalObject.Host,
+		Port:      utils.GlobalObject.TcpPort,
 		Router:    nil,
 	}
 

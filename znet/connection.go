@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"zinx/utils"
 	"zinx/ziface"
 )
 
@@ -96,7 +97,7 @@ func (connection *Connection) StartReader() {
 	defer connection.Stop()
 
 	for {
-		buf := make([]byte, 512)
+		buf := make([]byte, utils.GlobalObject.MaxPackageSize)
 		// 必须读到从客户端发来的数据才可以进行下一步处理
 		_, err := connection.Conn.Read(buf)
 		if err != nil && err != io.EOF {
