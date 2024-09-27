@@ -1,10 +1,10 @@
 package znet
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
-	"zinx/utils"
 	"zinx/ziface"
 )
 
@@ -82,7 +82,17 @@ func (connection *Connection) RemoteAddr() net.Addr {
 
 // SendMsg 发送数据，将数据发送给远程的客户端
 func (connection *Connection) SendMsg(msgId uint32, data []byte) error {
-	_, err := connection.Conn.Write(data)
+	if connection.isClosed {
+		return errors.New("connection closed when send msg")
+	}
+
+	dp := NewDataPack()
+	pack, err := dp.Pack(NewMessage(data, msgId))
+	if err != nil {
+		fmt.Println("Pack error msg id = ", msgId)
+		return err
+	}
+	_, err = connection.Conn.Write(pack)
 	if err != nil {
 		fmt.Println("SendMsg error", err)
 		return err
@@ -97,27 +107,35 @@ func (connection *Connection) StartReader() {
 	defer connection.Stop()
 
 	for {
-		buf := make([]byte, utils.GlobalObject.MaxPackageSize)
-		// 必须读到从客户端发来的数据才可以进行下一步处理
-		_, err := connection.Conn.Read(buf)
-		if err != nil && err != io.EOF {
-			fmt.Println("recv buf err", err)
-			continue
-		} else if err == io.EOF {
+		dp := NewDataPack()
+		// 读取客户端的 msg head
+		headData := make([]byte, dp.GetHeadLen())
+		_, err := io.ReadFull(connection.GetConnection(), headData)
+		if err != nil {
+			fmt.Println("read msg head error", err)
+			break
+		}
+		// 拆包，得到 msgId 和 msgDataLen 放在 msg 消息中
+		msg, err := dp.Unpack(headData)
+		if err != nil {
+			fmt.Println("unpack error", err)
+			break
+		}
+		// 根据 dataLen 读取 data，并放进 msg.Data 中
+		if msg.GetMsgLen() < 0 {
 			return
 		}
-
-		//// 调用当前链接所绑定的 HandleAPI
-		//if err := connection.handleAPI(connection.Conn, buf, read); err != nil {
-		//	fmt.Println("ConnID", connection.ConnID, "handle is error", "err is ", err)
-		//	break
-		//}
-
+		bytes := make([]byte, msg.GetMsgLen())
+		if _, err := io.ReadFull(connection.GetConnection(), bytes); err != nil {
+			fmt.Println("read msg data error", err)
+			break
+		}
+		msg.SetData(bytes)
 		// 得到当前数据的 request 请求
 		// 这个 buf 是服务器读出来的数据，由客户端发送过来的，现在要把它交给路由，让路由处理
 		request := &Request{
-			conn: connection,
-			data: buf,
+			conn:    connection,
+			message: msg,
 		}
 
 		// 执行注册路由的 Handle 方法
