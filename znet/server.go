@@ -21,8 +21,8 @@ type Server struct {
 	// Server port
 	Port int
 
-	// Router
-	Router ziface.IRouter
+	// MsgHandler
+	MsgHandler ziface.IMessageHandler
 }
 
 // CallBackToClient 当前客户端链接的所绑定的 API,后续由框架使用者自行开发
@@ -71,7 +71,7 @@ func (s *Server) Start() {
 			}
 
 			// 将处理连接的业务方法和 conn 进行绑定，得到我们的连接模块
-			connection := NewConnection(tcp, cid, s.Router)
+			connection := NewConnection(tcp, cid, s.MsgHandler)
 			cid++
 			connection.Start()
 		}
@@ -98,19 +98,19 @@ func (s *Server) Serve() {
 	select {}
 }
 
-func (s *Server) AddRouter(router ziface.IRouter) {
-	s.Router = router
+func (s *Server) AddRouter(msgId uint32, router ziface.IRouter) {
+	s.MsgHandler.AddRouter(msgId, router)
 	fmt.Println("Add Router succ!")
 }
 
 // NewServer create a server
 func NewServer() ziface.IServer {
 	s := &Server{
-		Name:      utils.GlobalObject.Name,
-		IPVersion: "tcp4",
-		IP:        utils.GlobalObject.Host,
-		Port:      utils.GlobalObject.TcpPort,
-		Router:    nil,
+		Name:       utils.GlobalObject.Name,
+		IPVersion:  "tcp4",
+		IP:         utils.GlobalObject.Host,
+		Port:       utils.GlobalObject.TcpPort,
+		MsgHandler: NewMessageHandler(),
 	}
 
 	return s
