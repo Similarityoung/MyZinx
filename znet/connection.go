@@ -22,6 +22,9 @@ type Connection struct {
 	// 告知当前链接已经退出/停止的 channel
 	ExitChan chan bool
 
+	// 无缓冲管道，用于读、写 goroutine 之间的消息通信
+	msgChan chan []byte
+
 	// 管理消息 MsgId 的处理业务方法
 	MsgHandler ziface.IMessageHandler
 }
@@ -31,9 +34,10 @@ func NewConnection(conn *net.TCPConn, connID uint32, msgHandler ziface.IMessageH
 	c := &Connection{
 		Conn:       conn,
 		ConnID:     connID,
-		MsgHandler: msgHandler,
 		isClosed:   false,
 		ExitChan:   make(chan bool, 1),
+		msgChan:    make(chan []byte),
+		MsgHandler: msgHandler,
 	}
 	return c
 }
@@ -44,6 +48,8 @@ func (connection *Connection) Start() {
 
 	// 启动当前链接的读数据业务
 	go connection.StartReader()
+	// 启动当前链接的写数据业务
+	go connection.StartWriter()
 }
 
 // Stop connection
@@ -60,6 +66,12 @@ func (connection *Connection) Stop() {
 	if err != nil {
 		return
 	}
+
+	// 通知从缓冲管道读数据的业务，该链接已经关闭
+	connection.ExitChan <- true
+
+	// 关闭管道
+	close(connection.msgChan)
 
 	// 关闭当前链接全部管道
 	close(connection.ExitChan)
@@ -92,18 +104,16 @@ func (connection *Connection) SendMsg(msgId uint32, data []byte) error {
 		fmt.Println("Pack error msg id = ", msgId)
 		return err
 	}
-	_, err = connection.Conn.Write(pack)
-	if err != nil {
-		fmt.Println("SendMsg error", err)
-		return err
-	}
+
+	connection.msgChan <- pack
+
 	return nil
 }
 
 // StartReader 启动读协程
 func (connection *Connection) StartReader() {
 	fmt.Println("Reader Goroutine is running...")
-	defer fmt.Println("connID = ", connection.ConnID, "Reader is exit, remote addr is ", connection.RemoteAddr().String())
+	defer fmt.Println("connID = ", connection.ConnID, "[Reader is exit], remote addr is ", connection.RemoteAddr().String())
 	defer connection.Stop()
 
 	for {
@@ -139,9 +149,25 @@ func (connection *Connection) StartReader() {
 		}
 
 		// 执行注册路由的 Handle 方法
-		go func() {
-			connection.MsgHandler.DoMsgHandler(request)
-		}()
+		go connection.MsgHandler.DoMsgHandler(request)
 	}
+}
 
+func (connection *Connection) StartWriter() {
+	fmt.Println("[Writer Goroutine is running]")
+	defer fmt.Println("[Writer is exit!], remote addr is ", connection.RemoteAddr().String())
+	defer connection.Stop()
+
+	for {
+		select {
+		case data := <-connection.msgChan:
+			if _, err := connection.Conn.Write(data); err != nil {
+				fmt.Println("Send data error", err)
+				return
+			}
+		case <-connection.ExitChan:
+			// 代表 reader 已经退出，此时 writer 也要退出
+			return
+		}
+	}
 }
