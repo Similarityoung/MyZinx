@@ -113,5 +113,8 @@ func NewServer() ziface.IServer {
 		MsgHandler: NewMessageHandler(),
 	}
 
+	// 初始化 WorkerPool
+	s.MsgHandler.StartWorkerPool()
+
 	return s
 }

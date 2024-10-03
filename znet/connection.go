@@ -149,7 +149,7 @@ func (connection *Connection) StartReader() {
 		}
 
 		// 执行注册路由的 Handle 方法
-		go connection.MsgHandler.DoMsgHandler(request)
+		connection.MsgHandler.SendMsgToTaskQueue(request)
 	}
 }
 
