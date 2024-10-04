@@ -23,6 +23,41 @@ type Server struct {
 
 	// MsgHandler
 	MsgHandler ziface.IMessageHandler
+
+	// ConnManager
+	ConnManager ziface.IConnManager
+
+	// OnConnStart callback
+	OnConnStart func(conn ziface.IConnection)
+
+	// OnConnStop callback
+	OnConnStop func(conn ziface.IConnection)
+}
+
+func (s *Server) GetConnManager() ziface.IConnManager {
+	return s.ConnManager
+}
+
+func (s *Server) SetOnConnStart(hookFunc func(conn ziface.IConnection)) {
+	s.OnConnStart = hookFunc
+}
+
+func (s *Server) SetOnConnStop(hookFunc func(conn ziface.IConnection)) {
+	s.OnConnStop = hookFunc
+}
+
+func (s *Server) CallOnConnStart(conn ziface.IConnection) {
+	if s.OnConnStart != nil {
+		fmt.Println("Call OnConnStart()...")
+		s.OnConnStart(conn)
+	}
+}
+
+func (s *Server) CallOnConnStop(conn ziface.IConnection) {
+	if s.OnConnStop != nil {
+		fmt.Println("Call OnConnStop()...")
+		s.OnConnStop(conn)
+	}
 }
 
 // CallBackToClient 当前客户端链接的所绑定的 API,后续由框架使用者自行开发
@@ -70,8 +105,19 @@ func (s *Server) Start() {
 				continue
 			}
 
+			if s.GetConnManager().Len() >= utils.GlobalObject.MaxConn {
+				// TODO 给客户端响应一个超出最大连接的错误包
+				fmt.Println("Too many connections, MaxConn = ", utils.GlobalObject.MaxConn)
+				err := tcp.Close()
+				if err != nil {
+					fmt.Println("Close err", err)
+					return
+				}
+				continue
+			}
+
 			// 将处理连接的业务方法和 conn 进行绑定，得到我们的连接模块
-			connection := NewConnection(tcp, cid, s.MsgHandler)
+			connection := NewConnection(s, tcp, cid, s.MsgHandler)
 			cid++
 			connection.Start()
 		}
@@ -81,8 +127,8 @@ func (s *Server) Start() {
 // Stop server
 func (s *Server) Stop() {
 
-	// TODO
-	// Do some server stop work, such as releasing the resource, etc.
+	fmt.Println("[STOP] Zinx server name ", s.Name)
+	s.GetConnManager().ClearConn()
 
 }
 
@@ -106,11 +152,12 @@ func (s *Server) AddRouter(msgId uint32, router ziface.IRouter) {
 // NewServer create a server
 func NewServer() ziface.IServer {
 	s := &Server{
-		Name:       utils.GlobalObject.Name,
-		IPVersion:  "tcp4",
-		IP:         utils.GlobalObject.Host,
-		Port:       utils.GlobalObject.TcpPort,
-		MsgHandler: NewMessageHandler(),
+		Name:        utils.GlobalObject.Name,
+		IPVersion:   "tcp4",
+		IP:          utils.GlobalObject.Host,
+		Port:        utils.GlobalObject.TcpPort,
+		MsgHandler:  NewMessageHandler(),
+		ConnManager: NewConnManager(),
 	}
 
 	// 初始化 WorkerPool

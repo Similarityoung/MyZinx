@@ -10,6 +10,9 @@ import (
 
 // Connection 接口实现
 type Connection struct {
+	// 当前 conn 的 server
+	TcpServer ziface.IServer
+
 	// 当前链接的 socket TCP 套接字
 	Conn *net.TCPConn
 
@@ -30,8 +33,9 @@ type Connection struct {
 }
 
 // NewConnection 初始化链接模块的方法
-func NewConnection(conn *net.TCPConn, connID uint32, msgHandler ziface.IMessageHandler) *Connection {
+func NewConnection(server ziface.IServer, conn *net.TCPConn, connID uint32, msgHandler ziface.IMessageHandler) *Connection {
 	c := &Connection{
+		TcpServer:  server,
 		Conn:       conn,
 		ConnID:     connID,
 		isClosed:   false,
@@ -39,6 +43,8 @@ func NewConnection(conn *net.TCPConn, connID uint32, msgHandler ziface.IMessageH
 		msgChan:    make(chan []byte),
 		MsgHandler: msgHandler,
 	}
+
+	c.TcpServer.GetConnManager().Add(c)
 	return c
 }
 
@@ -50,6 +56,9 @@ func (connection *Connection) Start() {
 	go connection.StartReader()
 	// 启动当前链接的写数据业务
 	go connection.StartWriter()
+
+	// 调用 OnConnStart 钩子函数
+	connection.TcpServer.CallOnConnStart(connection)
 }
 
 // Stop connection
@@ -61,6 +70,8 @@ func (connection *Connection) Stop() {
 	}
 	connection.isClosed = true
 
+	connection.TcpServer.CallOnConnStop(connection)
+
 	// 关闭 socket 链接
 	err := connection.Conn.Close()
 	if err != nil {
@@ -69,6 +80,9 @@ func (connection *Connection) Stop() {
 
 	// 通知从缓冲管道读数据的业务，该链接已经关闭
 	connection.ExitChan <- true
+
+	// 将当前链接从 ConnManager 中移除
+	connection.TcpServer.GetConnManager().Remove(connection)
 
 	// 关闭管道
 	close(connection.msgChan)

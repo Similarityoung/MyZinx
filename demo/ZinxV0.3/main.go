@@ -39,7 +39,7 @@ func main() {
 	s := znet.NewServer()
 
 	// 注册路由
-	s.AddRouter(&Router{})
+	s.AddRouter(0, &Router{})
 
 	s.Serve()
 

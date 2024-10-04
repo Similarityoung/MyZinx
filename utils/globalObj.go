@@ -28,6 +28,7 @@ type GlobalObj struct {
 	MaxPackageSize   uint32
 	WorkerPoolSize   uint32 // 业务工作 Worker 池的数量
 	MaxWorkerTaskLen uint32 // 业务工作 Worker 对应负责的任务队列最大任务存储数量
+
 }
 
 func (o *GlobalObj) Reload() {

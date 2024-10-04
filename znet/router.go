@@ -1,6 +1,9 @@
 package znet
 
-import "zinx/ziface"
+import (
+	"fmt"
+	"zinx/ziface"
+)
 
 // BaseRouter 实现 ziface.IRouter 接口时，先嵌入这个基类，然后根据需要对这个基类的方法进行重写
 // 这样就不需要每次实现 IRouter 接口时，都要实现 PreHandle、Handle、PostHandle 这三个方法
@@ -9,16 +12,16 @@ import "zinx/ziface"
 type BaseRouter struct{}
 
 func (b *BaseRouter) PreHandle(request ziface.IRequest) {
-	//TODO implement me
-	panic("implement me")
+	fmt.Println("无事发生 PrHandle")
+	_ = request.GetConnection().SendMsg(1, []byte("无事发生 PrHandle\n"))
 }
 
 func (b *BaseRouter) Handle(request ziface.IRequest) {
-	//TODO implement me
-	panic("implement me")
+	fmt.Println("无事发生 Handle")
+	_ = request.GetConnection().SendMsg(1, []byte("无事发生 Handle\n"))
 }
 
 func (b *BaseRouter) PostHandle(request ziface.IRequest) {
-	//TODO implement me
-	panic("implement me")
+	fmt.Println("无事发生 PostHandle")
+	_ = request.GetConnection().SendMsg(1, []byte("无事发生 PostHandle\n"))
 }

@@ -13,4 +13,19 @@ type IServer interface {
 
 	// AddRouter Add router to server
 	AddRouter(mgsId uint32, router IRouter)
+
+	// GetConnManager Get connection manager
+	GetConnManager() IConnManager
+
+	// SetOnConnStart Set callback function when connection start
+	SetOnConnStart(hookFunc func(conn IConnection))
+
+	// SetOnConnStop Set callback function when connection stop
+	SetOnConnStop(hookFunc func(conn IConnection))
+
+	// CallOnConnStart Call callback function when connection start
+	CallOnConnStart(conn IConnection)
+
+	// CallOnConnStop Call callback function when connection stop
+	CallOnConnStop(conn IConnection)
 }
