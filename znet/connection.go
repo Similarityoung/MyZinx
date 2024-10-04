@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 	"zinx/ziface"
 )
 
@@ -30,6 +31,40 @@ type Connection struct {
 
 	// 管理消息 MsgId 的处理业务方法
 	MsgHandler ziface.IMessageHandler
+
+	// 链接属性集合
+	property map[string]interface{}
+
+	// 保护链接属性的锁
+	propertyLock sync.RWMutex
+}
+
+func (connection *Connection) SetProperty(key string, value interface{}) {
+	connection.propertyLock.Lock()
+	defer connection.propertyLock.Unlock()
+
+	// 添加属性
+	connection.property[key] = value
+}
+
+func (connection *Connection) GetProperty(key string) (interface{}, error) {
+	connection.propertyLock.RLock()
+	defer connection.propertyLock.RUnlock()
+
+	// 读取属性
+	if value, ok := connection.property[key]; ok {
+		return value, nil
+	} else {
+		return nil, errors.New("no property found")
+	}
+}
+
+func (connection *Connection) RemoveProperty(key string) {
+	connection.propertyLock.Lock()
+	defer connection.propertyLock.Unlock()
+
+	// 删除属性
+	delete(connection.property, key)
 }
 
 // NewConnection 初始化链接模块的方法
@@ -42,6 +77,7 @@ func NewConnection(server ziface.IServer, conn *net.TCPConn, connID uint32, msgH
 		ExitChan:   make(chan bool, 1),
 		msgChan:    make(chan []byte),
 		MsgHandler: msgHandler,
+		property:   make(map[string]interface{}),
 	}
 
 	c.TcpServer.GetConnManager().Add(c)
